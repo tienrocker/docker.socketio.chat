@@ -1,0 +1,17 @@
+services:
+  nodejs:
+  # docker exec -it docker_nodejs_chat-app-1 /bin/bash
+    build: .
+    ports:
+      - '3000:3000'
+    depends_on:
+      - mongodb
+    volumes:
+      - .:/app
+
+  mongodb:
+    image: mongo
+    ports:
+      - '27017:27017'
+    volumes:
+      - ./mongo_data:/data/db
