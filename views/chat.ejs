@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat</title>
+  <link href="/css/styles.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-gray-100 min-h-screen flex flex-col">
+  <div class="flex-1 max-w-4xl mx-auto w-full p-6">
+    <h1 class="text-2xl font-bold text-gray-800 mb-4">
+      Chat - Welcome, <%= username %> (<span id="userCount" class="text-blue-600">0</span> online)
+    </h1>
+    <div id="status">
+    </div>
+    <div id="chatArea" class="bg-white p-4 rounded-lg shadow-lg h-96 overflow-y-auto mb-4 flex flex-col">
+    </div>
+    <div class="flex space-x-2">
+      <input id="messageInput" type="text" placeholder="Type a message..."
+        class="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <button id="sendButton" class="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition">Send</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/moment.min.js"></script>
+  <script>
+    const token = '<%= token %>';
+    const username = '<%= username %>';
+    const socket = io({ auth: { token: token } });
+
+    const status = document.getElementById('status');
+    const chatArea = document.getElementById('chatArea');
+    const messageInput = document.getElementById('messageInput');
+    const sendButton = document.getElementById('sendButton');
+    const userCount = document.getElementById('userCount');
+
+    socket.on('connect', () => {
+      status.className = 'text-blue-600';
+      status.innerHTML = `${moment().format('YYYY-MM-DD HH:mm:ss')} Connected to server`;
+    });
+
+    socket.on('disconnect', () => {
+      status.className = 'text-red-500';
+      status.innerHTML = `${moment().format('YYYY-MM-DD HH:mm:ss')} Disconnected to server`;
+    });
+
+    socket.on('message', (data) => {
+      appendMessage(data.user, data.message, data.timestamp);
+    });
+
+    socket.on('userCount', (count) => {
+      userCount.textContent = count;
+    });
+
+    socket.on('connect_error', (error) => {
+      status.className = 'text-red-500';
+      status.innerHTML = `${moment().format('YYYY-MM-DD HH:mm:ss')} ${error}`;
+    });
+
+    socket.on('error', (error) => {
+      status.className = 'text-red-500';
+      status.innerHTML = `${moment().format('YYYY-MM-DD HH:mm:ss')} Error: ${error}`;
+    });
+
+    sendButton.addEventListener('click', () => {
+      const message = messageInput.value.trim();
+      if (message) {
+        socket.emit('message', message);
+        messageInput.value = '';
+      }
+    });
+
+    messageInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendButton.click();
+      }
+    });
+
+    function messageHtml(user, message, timestamp) {
+      timestamp = timestamp === undefined ? Date.now : timestamp;
+      return `<span class="text-xs">${moment(timestamp).format('YYYY-MM-DD HH:mm:ss')}</span> <strong>${user}:</strong> ${message}`;
+    }
+
+    function appendMessage(user, message, timestamp) {
+      const div = document.createElement('div');
+      div.className = 'p-2 border-b border-gray-200';
+      div.dataset.timestamp = timestamp;
+      div.innerHTML = messageHtml(user, message, timestamp);
+      chatArea.appendChild(div);
+      chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    async function loadMessage(before) {
+      const response = await fetch(`/more-chats?before=${before}`);
+      const olderChats = await response.json();
+      if (olderChats.length > 0) {
+        const scrollHeightBefore = chatArea.scrollHeight;
+        // lộn ngược lại thứ tự dòng chat
+        olderChats.forEach(chat => {
+          const div = document.createElement('div');
+          div.className = 'p-2 border-b border-gray-200';
+          div.dataset.timestamp = chat.timestamp;
+          div.innerHTML = messageHtml(chat.user, chat.message, chat.timestamp);
+          chatArea.insertBefore(div, chatArea.firstElementChild);
+        });
+        chatArea.scrollTop = chatArea.scrollHeight - scrollHeightBefore;
+      }
+    }
+
+    // Infinite scroll
+    let isLoading = false;
+    chatArea.addEventListener('scroll', async () => {
+      if (chatArea.scrollTop === 0 && !isLoading) {
+        isLoading = true;
+        const firstMessage = chatArea.firstElementChild;
+        if (firstMessage !== undefined) {
+          const before = firstMessage.dataset.timestamp;
+          await loadMessage(before);
+        }
+        isLoading = false;
+      }
+    });
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      const firstMessage = chatArea.firstElementChild;
+      if (firstMessage === null) {
+        await loadMessage();
+      }
+    });
+
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Online Users</title>
+  <link href="/css/styles.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+    <h1 class="text-2xl font-bold text-gray-800 mb-4">
+      Online Users (<span id="userCount" class="text-blue-600">
+        <%= users.length %>
+      </span>)
+    </h1>
+    <ul id="userList" class="space-y-2">
+      <% users.forEach(user=> { %>
+        <li class="p-3 bg-gray-50 rounded-md text-gray-700">
+          <%= user %>
+        </li>
+        <% }) %>
+    </ul>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io({
+      auth: { token: localStorage.getItem('jwtToken') }
+    });
+
+    socket.on('userCount', (count) => {
+      document.getElementById('userCount').textContent = count;
+    });
+
+    socket.on('onlineUsers', (users) => {
+      const userList = document.getElementById('userList');
+      userList.innerHTML = '';
+      users.forEach(user => {
+        const li = document.createElement('li');
+        li.textContent = user;
+        li.className = 'p-3 bg-gray-50 rounded-md text-gray-700';
+        userList.appendChild(li);
+      });
+    });
+  </script>
+</body>
+
+</html>
